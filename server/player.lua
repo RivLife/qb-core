@@ -301,9 +301,15 @@ function QBCore.Player.CreatePlayer(PlayerData, Offline)
         reason = reason or 'unknown'
         amount = tonumber(amount)
         if amount < 0 then return end
-        if not self.PlayerData.money[moneytype] then return false end
-        self.PlayerData.money[moneytype] = self.PlayerData.money[moneytype] + amount
-
+        if moneytype == 'bank' then
+            local data = {}
+            data.amount = amount
+            data.message = reason
+            exports.pefcl:addBankBalance(self.PlayerData.source, data)
+        else
+            if not self.PlayerData.money[moneytype] then return false end
+            self.PlayerData.money[moneytype] = self.PlayerData.money[moneytype] + amount
+        end
         if not self.Offline then
             self.Functions.UpdatePlayerData()
             if amount > 100000 then
@@ -330,8 +336,20 @@ function QBCore.Player.CreatePlayer(PlayerData, Offline)
                     return false
                 end
             end
+            if moneytype == 'bank' then
+                if (exports.pefcl:getDefaultAccountBalance(self.PlayerData.source).data - amount) < 0 then
+                    return false
+                end
+            end
         end
-        self.PlayerData.money[moneytype] = self.PlayerData.money[moneytype] - amount
+        if moneytype == 'bank' then
+            local data = {}
+            data.amount = amount
+            data.message = reason
+            exports.pefcl:removeBankBalance(self.PlayerData.source, data)
+        else
+            self.PlayerData.money[moneytype] = self.PlayerData.money[moneytype] - amount
+        end
 
         if not self.Offline then
             self.Functions.UpdatePlayerData()
@@ -354,11 +372,19 @@ function QBCore.Player.CreatePlayer(PlayerData, Offline)
     function self.Functions.SetMoney(moneytype, amount, reason)
         reason = reason or 'unknown'
         amount = tonumber(amount)
+        local difference
         if amount < 0 then return false end
-        if not self.PlayerData.money[moneytype] then return false end
-        local difference = amount - self.PlayerData.money[moneytype]
-        self.PlayerData.money[moneytype] = amount
-
+        if moneytype == 'bank' then
+            local data = {}
+            data.amount = amount
+            exports.pefcl:setBankBalance(self.PlayerData.source, data)
+            difference = amount - self.PlayerData.money[moneytype]
+            self.PlayerData.money[moneytype] = exports.pefcl:getDefaultAccountBalance(self.PlayerData.source).data or 0
+        else
+            if not self.PlayerData.money[moneytype] then return false end
+            difference = amount - self.PlayerData.money[moneytype]
+            self.PlayerData.money[moneytype] = amount
+        end
         if not self.Offline then
             self.Functions.UpdatePlayerData()
             TriggerEvent('qb-log:server:CreateLog', 'playermoney', 'SetMoney', 'green', '**' .. GetPlayerName(self.PlayerData.source) .. ' (citizenid: ' .. self.PlayerData.citizenid .. ' | id: ' .. self.PlayerData.source .. ')** $' .. amount .. ' (' .. moneytype .. ') set, new ' .. moneytype .. ' balance: ' .. self.PlayerData.money[moneytype] .. ' reason: ' .. reason)
@@ -372,7 +398,18 @@ function QBCore.Player.CreatePlayer(PlayerData, Offline)
 
     function self.Functions.GetMoney(moneytype)
         if not moneytype then return false end
+        if moneytype == 'bank' then
+            self.PlayerData.money[moneytype] = exports.pefcl:getDefaultAccountBalance(self.PlayerData.source).data or 0
+            return exports.pefcl:getDefaultAccountBalance(self.PlayerData.source).data
+        end
         return self.PlayerData.money[moneytype]
+    end
+    function self.Functions.SyncMoney() 
+        local money = exports.pefcl:getDefaultAccountBalance(self.PlayerData.source).data
+        self.PlayerData.money['bank'] = money
+    if not self.Offline then
+        self.Functions.UpdatePlayerData()
+    end
     end
 
     function self.Functions.SetCreditCard(cardNumber)
