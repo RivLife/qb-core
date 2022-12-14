@@ -36,6 +36,10 @@ QBShared.Jobs = {
             },
 			[4] = {
                 name = 'Chief',
+                payment = 150
+            },
+            [5] = {
+                name = 'Chief',
 				isboss = true,
                 payment = 150
             },
